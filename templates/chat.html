@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .message-content {
+            white-space: pre-wrap;
+        }
+        .typing-indicator::after {
+            content: '...';
+            animation: typing 1.5s infinite;
+        }
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <h1 class="text-xl font-semibold text-gray-900">AI Agent Chat</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <select id="providerSelect" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="huggingface">HuggingFace</option>
+                </select>
+                <select id="modelSelect" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                </select>
+                <button id="clearChat" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Chat Container -->
+    <main class="flex-1 overflow-hidden">
+        <div id="chatContainer" class="h-full px-6 py-4 overflow-y-auto">
+            <div id="messagesContainer" class="max-w-3xl mx-auto space-y-4">
+                <!-- Welcome Message -->
+                <div class="text-center py-8">
+                    <h2 class="text-lg font-medium text-gray-900 mb-2">Welcome to AI Agent Chat</h2>
+                    <p class="text-gray-600">Start a conversation with your AI assistant</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="bg-white border-t border-gray-200 px-6 py-4">
+        <div class="max-w-3xl mx-auto">
+            <div class="flex items-end space-x-3">
+                <div class="flex-1">
+                    <textarea 
+                        id="messageInput" 
+                        rows="3" 
+                        placeholder="Type your message here..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    ></textarea>
+                </div>
+                <button 
+                    id="sendButton" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Send
+                </button>
+            </div>
+            <div class="flex items-center justify-between mt-3 text-sm text-gray-500">
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                        <span class="mr-2">Temperature:</span>
+                        <input type="range" id="temperatureSlider" min="0" max="1" step="0.1" value="0.7" class="w-20">
+                        <span id="temperatureValue" class="ml-1">0.7</span>
+                    </label>
+                    <label class="flex items-center">
+                        <span class="mr-2">Max Tokens:</span>
+                        <input type="number" id="maxTokensInput" value="1000" min="100" max="4000" class="w-20 px-2 py-1 border border-gray-300 rounded">
+                    </label>
+                </div>
+                <div id="connectionStatus" class="flex items-center">
+                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Connected</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // State
+        let conversationId = null;
+        let websocket = null;
+        let isTyping = false;
+
+        // DOM elements
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const providerSelect = document.getElementById('providerSelect');
+        const modelSelect = document.getElementById('modelSelect');
+        const clearChatBtn = document.getElementById('clearChat');
+        const temperatureSlider = document.getElementById('temperatureSlider');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const maxTokensInput = document.getElementById('maxTokensInput');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // Model configurations
+        const models = {
+            openai: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo-preview'],
+            anthropic: ['claude-3-sonnet-20240229', 'claude-3-opus-20240229'],
+            huggingface: ['microsoft/DialoGPT-medium', 'microsoft/DialoGPT-large']
+        };
+
+        // Update model options when provider changes
+        providerSelect.addEventListener('change', () => {
+            const provider = providerSelect.value;
+            modelSelect.innerHTML = '';
+            models[provider].forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+        });
+
+        // Temperature slider
+        temperatureSlider.addEventListener('input', () => {
+            temperatureValue.textContent = temperatureSlider.value;
+        });
+
+        // Generate conversation ID
+        function generateConversationId() {
+            return 'conv-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Add message to chat
+        function addMessage(role, content, isStreaming = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start space-x-3 ${role === 'user' ? 'justify-end' : ''}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex items-center justify-center ${
+                role === 'user' ? 'bg-blue-600' : 'bg-gray-600'
+            }`;
+            avatar.innerHTML = role === 'user' 
+                ? 'U'
+                : 'AI';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = `max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                role === 'user' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-100 text-gray-900'
+            }`;
+            messageContent.innerHTML = `<div class="message-content">${content}</div>`;
+            
+            if (role === 'user') {
+                messageDiv.appendChild(messageContent);
+                messageDiv.appendChild(avatar);
+            } else {
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(messageContent);
+            }
+            
+            if (isStreaming) {
+                messageDiv.id = 'streaming-message';
+            }
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Reinitialize icons
+            lucide.createIcons();
+        }
+
+        // Update streaming message
+        function updateStreamingMessage(content) {
+            const streamingMessage = document.getElementById('streaming-message');
+            if (streamingMessage) {
+                const contentDiv = streamingMessage.querySelector('.message-content');
+                contentDiv.textContent = content;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // Complete streaming message
+        function completeStreamingMessage() {
+            const streamingMessage = document.getElementById('streaming-message');
+            if (streamingMessage) {
+                streamingMessage.removeAttribute('id');
+            }
+            isTyping = false;
+            sendButton.disabled = false;
+            sendButton.innerHTML = '<i data-lucide="send" class="w-5 h-5"></i>';
+            lucide.createIcons();
+        }
+
+        // Connect WebSocket
+        function connectWebSocket() {
+            if (!conversationId) {
+                conversationId = generateConversationId();
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/${conversationId}`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+            };
+            
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'chunk') {
+                    if (!isTyping) {
+                        isTyping = true;
+                        addMessage('assistant', '', true);
+                    }
+                    const streamingMessage = document.getElementById('streaming-message');
+                    if (streamingMessage) {
+                        const contentDiv = streamingMessage.querySelector('.message-content');
+                        contentDiv.textContent += data.content;
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                } else if (data.type === 'complete') {
+                    completeStreamingMessage();
+                } else if (data.type === 'error') {
+                    completeStreamingMessage();
+                    addMessage('assistant', `Error: ${data.message}`);
+                }
+            };
+            
+            websocket.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                isTyping = false;
+                sendButton.disabled = false;
+            };
+            
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+            };
+        }
+
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            const statusDiv = connectionStatus.querySelector('div');
+            const statusText = connectionStatus.querySelector('span');
+            
+            if (connected) {
+                statusDiv.className = 'w-2 h-2 bg-green-500 rounded-full mr-2';
+                statusText.textContent = 'Connected';
+            } else {
+                statusDiv.className = 'w-2 h-2 bg-red-500 rounded-full mr-2';
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isTyping) return;
+            
+            // Add user message
+            addMessage('user', message);
+            
+            // Clear input
+            messageInput.value = '';
+            
+            // Disable send button
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+            
+            // Connect WebSocket if not connected
+            if (!websocket || websocket.readyState === WebSocket.CLOSED) {
+                connectWebSocket();
+                
+                // Wait for connection
+                await new Promise(resolve => {
+                    if (websocket.readyState === WebSocket.OPEN) {
+                        resolve();
+                    } else {
+                        websocket.onopen = resolve;
+                    }
+                });
+            }
+            
+            // Send message
+            websocket.send(JSON.stringify({
+                message: message,
+                provider: providerSelect.value,
+                model: modelSelect.value,
+                temperature: parseFloat(temperatureSlider.value),
+                max_tokens: parseInt(maxTokensInput.value)
+            }));
+        }
+
+        // Clear chat
+        function clearChat() {
+            if (websocket) {
+                websocket.close();
+            }
+            conversationId = null;
+            websocket = null;
+            messagesContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <h2 class="text-lg font-medium text-gray-900 mb-2">Welcome to AI Agent Chat</h2>
+                    <p class="text-gray-600">Start a conversation with your AI assistant</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        clearChatBtn.addEventListener('click', clearChat);
+        
+        // Auto-resize textarea
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = messageInput.scrollHeight + 'px';
+        });
+        
+        // Initialize
+        connectWebSocket();
+    </script>
+</body>
+</html>
