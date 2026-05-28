@@ -2,8 +2,7 @@
 Interview preparation engine.
 
 Generates a Company Intelligence Sheet and a tailored mock-interview pack
-for a specific role. Works entirely from structured data — no LLM key required.
-When ANTHROPIC_API_KEY is set, enhances the company brief with live context.
+for a specific role. Works entirely from structured data — no external API required.
 """
 
 import random

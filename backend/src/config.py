@@ -1,16 +1,8 @@
 import os
-from typing import Optional
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-
-    default_model: str = "gpt-4o-mini"
-    max_tokens: int = 2048
-    temperature: float = 0.65
-
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./tapapply.db")
     redis_url: str = "redis://localhost:6379"
 

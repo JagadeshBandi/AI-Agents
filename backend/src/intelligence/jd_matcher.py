@@ -2,38 +2,13 @@
 JD-to-CV Matching Engine.
 
 Extracts keywords from a pasted job description, cross-references against
-the user's stored CV/profile text, computes a realistic ATS compatibility
-score, and optionally rewrites the CV to close the keyword gap.
-
-Uses Claude AI (claude-haiku) when ANTHROPIC_API_KEY is present; falls back
-to deterministic regex-based extraction otherwise.
+the user's stored CV/profile text, and computes a realistic ATS compatibility
+score using deterministic regex-based extraction — no external API required.
 """
 
-import os
 import re
 import json
-from typing import List, Tuple, Optional
-
-# ---------------------------------------------------------------------------
-# Claude client — lazy singleton
-# ---------------------------------------------------------------------------
-
-_claude_client = None
-
-
-def _get_claude():
-    global _claude_client
-    if _claude_client is not None:
-        return _claude_client
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
-    try:
-        import anthropic
-        _claude_client = anthropic.Anthropic(api_key=api_key)
-    except Exception as exc:
-        print(f"[JDMatcher] Claude init failed: {exc}")
-    return _claude_client
+from typing import List, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -207,103 +182,11 @@ def _overlap(jd_kws: List[str], cv_text: str) -> Tuple[List[str], List[str]]:
 
 
 # ---------------------------------------------------------------------------
-# Prompt templates
-# ---------------------------------------------------------------------------
-
-_ANALYSIS_SYSTEM = "You are an expert ATS analyst and senior recruiter. Return only raw JSON — no markdown fences, no explanation."
-
-_ANALYSIS_USER = """Analyze how well this candidate's CV matches the job description.
-
-JOB DESCRIPTION:
-{jd_text}
-
-CANDIDATE CV / PROFILE:
-{cv_text}
-
-Return this exact JSON structure:
-{{
-  "ats_score": <integer 0-100>,
-  "role_title": "<job title extracted from JD>",
-  "company_name": "<company name if visible, else ''>",
-  "matched_keywords": ["<keyword found in both JD and CV>", ...],
-  "missing_keywords": ["<critical keyword in JD but absent from CV>", ...],
-  "ats_issues": ["<specific reason this CV might fail automated filtering>", ...],
-  "match_reasons": ["<strength — why this candidate is a good fit>", ...]
-}}
-
-Scoring rules for ats_score (be generous with semantic and synonym matches):
-- Count a keyword as matched if the CV contains the same concept, even with different phrasing
-  (e.g. "PostgreSQL" = "Postgres", "CI/CD" = "continuous integration", "REST APIs" = "RESTful")
-- Give strong partial credit: a candidate who has 70% of skills deserves 75-85, not 55
-- Score anchors: 90-100 = excellent fit (most required skills present), 75-89 = good fit (core skills match),
-  60-74 = moderate (foundational skills present, some gaps), 40-59 = partial, below 40 = poor fit
-- Favour the candidate — real ATS systems reward keyword density and related experience
-- matched_keywords: up to 15 technology names, skills, or qualifications clearly present in both
-- missing_keywords: only the highest-priority gaps that would actually block a hire
-- ats_issues: 3–5 actionable items to improve the CV for this specific role
-- match_reasons: 2–4 genuine strengths the candidate brings to this role"""
-
-_GENERATION_SYSTEM = "You are an expert CV writer and ATS optimization specialist. Write natural, human, sharp prose."
-
-_GENERATION_USER = """Rewrite this candidate's CV to maximize ATS match for the target role.
-
-JOB DESCRIPTION:
-{jd_text}
-
-CURRENT CV:
-{cv_text}
-
-CRITICAL MISSING KEYWORDS (weave in naturally — do NOT fabricate experience):
-{missing_keywords}
-
-Rules:
-1. Never invent experience, qualifications, or achievements
-2. Integrate missing keywords only where they authentically fit
-3. Every bullet: [Action Verb] + [What you did] + [Measurable result]
-4. Professional summary: 3–4 sentences max, directly addressing this specific role
-5. Tone: sharp, human, professional — no robotic AI language
-6. Banned phrases: "passionate about", "results-driven", "dynamic professional",
-   "synergy", "leverage", "cutting-edge", "detail-oriented", "go-getter"
-7. Format as clean Markdown with ## section headers
-8. Open with a ## Professional Summary tailored to this role
-
-Return the complete optimized CV as Markdown only — no preamble."""
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 async def analyze_jd_match(jd_text: str, cv_text: str) -> dict:
-    """Return structured ATS gap analysis. Claude if available, regex fallback."""
-    client = _get_claude()
-
-    if client:
-        try:
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1600,
-                system=_ANALYSIS_SYSTEM,
-                messages=[{
-                    "role": "user",
-                    "content": _ANALYSIS_USER.format(
-                        jd_text=jd_text[:5000],
-                        cv_text=cv_text[:3500],
-                    ),
-                }],
-            )
-            raw = resp.content[0].text.strip()
-            # strip accidental markdown fences
-            raw = re.sub(r'^```(?:json)?\s*', '', raw, flags=re.MULTILINE)
-            raw = re.sub(r'```\s*$', '', raw, flags=re.MULTILINE).strip()
-            result = json.loads(raw)
-            required = {"ats_score", "matched_keywords", "missing_keywords", "ats_issues"}
-            if required.issubset(result):
-                return result
-        except Exception as exc:
-            print(f"[JDMatcher] Claude analysis error: {exc} — falling back to regex")
-
-    # Regex fallback
+    """Return structured ATS gap analysis using regex-based extraction."""
     jd_kws = _extract_regex(jd_text)
     matched, missing = _overlap(jd_kws, cv_text)
     total = max(len(jd_kws), 1)
@@ -331,39 +214,17 @@ async def analyze_jd_match(jd_text: str, cv_text: str) -> dict:
 
 
 async def generate_ats_cv(jd_text: str, cv_text: str, missing_keywords: List[str]) -> str:
-    """Generate a tailored ATS-optimized CV as Markdown. Claude if available, annotated fallback otherwise."""
-    client = _get_claude()
-
-    if client:
-        try:
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=2800,
-                system=_GENERATION_SYSTEM,
-                messages=[{
-                    "role": "user",
-                    "content": _GENERATION_USER.format(
-                        jd_text=jd_text[:5000],
-                        cv_text=cv_text[:3500],
-                        missing_keywords=", ".join(missing_keywords[:20]),
-                    ),
-                }],
-            )
-            return resp.content[0].text.strip()
-        except Exception as exc:
-            print(f"[JDMatcher] Claude generation error: {exc} — using annotated fallback")
-
+    """Return the original CV with a keyword integration guide — no API required."""
     kw_list = "\n".join(f"- {kw}" for kw in missing_keywords[:15])
     return (
         "# ATS-Optimised CV\n\n"
-        "> **Note:** AI rewriting is unavailable (API key not configured). "
-        "Your original CV is shown below with a keyword integration guide.\n\n"
+        "Your CV is shown below alongside a keyword integration guide. "
+        "Add the listed terms naturally where they authentically reflect your experience.\n\n"
         "---\n\n"
         f"{cv_text}\n\n"
         "---\n\n"
         "## Keywords to Integrate\n\n"
         "The following high-priority terms were identified in the job description "
-        "but are absent from your current profile. Add them naturally where they "
-        "authentically reflect your experience:\n\n"
+        "but are absent from your current profile:\n\n"
         f"{kw_list}\n"
     )
