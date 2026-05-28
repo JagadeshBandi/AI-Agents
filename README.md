@@ -1,143 +1,131 @@
-# CareerNavigator AI
+# TapApply
 
-Your AI-powered assistant for UK and USA job hunting, CV optimization, LinkedIn enhancement, and career advancement. Get ATS-friendly CV analysis, job description matching, recruiter connection strategies, and freelancing guidance.
-
-### 1. Installation
-
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd AI-Agents
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Configuration
-
-```bash
-# Copy the environment file
-cp .env.example .env
-
-# Edit .env with your API keys
-OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-HUGGINGFACE_TOKEN=your_huggingface_token_here
-```
-
-### 3. Run the Application
-
-**Start CareerNavigator AI**
-```bash
-python app.py
-```
-
-**Access the Career Dashboard**
-- Open browser to http://localhost:8000
-- Navigate to CareerNavigator interface
-
-**Alternative Streamlit Interface**
-```bash
-streamlit run streamlit_app.py
-```
-
-### 4. Access CareerNavigator
-
-- **CareerNavigator Dashboard**: http://localhost:8000/career
-- **CV Analyzer**: Analyze and optimize your CV for ATS systems
-- **Job Matcher**: Match your CV against job descriptions
-- **LinkedIn Optimizer**: Enhance your LinkedIn profile
-- **Job Search Strategy**: Get market-specific job hunting guidance
-- **Recruiter Connection**: Learn how to connect with recruiters
-- **Freelancing Guide**: Platform recommendations and strategies
-
-The system provides instant analysis and actionable recommendations for your career advancement.
-
-## Project Structure
-
-```
-AI-Agents/
-├── src/                      # Source code
-│   ├── career_navigator.py  # CareerNavigator AI core system
-│   ├── agent.py             # Core AI agent classes
-│   ├── api.py               # Basic FastAPI web server
-│   ├── advanced_api.py      # Advanced API with automation
-│   ├── automation.py        # Advanced automation engine
-│   ├── config.py            # Configuration management
-│   ├── llm_providers.py     # LLM provider implementations
-│   └── training.py          # Model training and fine-tuning
-├── templates/               # HTML templates
-│   ├── career_navigator.html # CareerNavigator web interface
-│   └── chat.html            # Web chat interface
-├── static/                  # Static assets
-├── data/                    # Training and conversation data
-├── models/                  # Trained models
-├── app.py                   # Main automated web application
-├── main.py                  # Alternative entry point
-├── streamlit_app.py         # Streamlit interface
-├── requirements.txt         # Python dependencies
-└── .env.example            # Environment variables template
-
-```
-
-## CareerNavigator Usage
-
-### CV Analysis Example
-
-1. Navigate to CV Analyzer tab
-2. Select target country (UK or USA)
-3. Enter target role
-4. Paste your CV content
-5. Click "Analyze CV"
-6. Review detailed scores and recommendations
-
-### Job Matching Example
-
-1. Go to Job Matcher tab
-2. Paste your CV in left panel
-3. Paste job description in right panel
-4. Click "Calculate Match Score"
-5. Review match percentage and missing keywords
-6. Apply recommendations to improve match
-
-### LinkedIn Optimization
-
-1. Open LinkedIn Optimizer tab
-2. Enter your headline, summary, and skills
-3. Select target country
-4. Click "Optimize Profile"
-5. Implement suggested improvements
-
-### Recruiter Connection Strategy
-
-1. Select Recruiters tab
-2. Choose your industry and target country
-3. Get personalized connection strategies
-4. Use provided message templates
-5. Follow dos and don'ts guidelines
-
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-If you have questions or need help:
-
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue with details
-4. Join our community discussions
+Autonomous global job application platform. Upload your CV (or build one from scratch) and let TapApply apply to jobs across 10 regions 24/7 — tracking every application, preparing you for interviews, and staying compliant with robots.txt at every step.
 
 ---
 
-**Built with care for the AI community**
+## Architecture
+
+```
+tapapply/
+├── backend/          # FastAPI service (Python 3.11+)
+│   ├── app.py        # Main application, all routes
+│   ├── Dockerfile
+│   └── src/
+│       ├── automation/    # Playwright stealth browser engine
+│       ├── compliance/    # GDPR transience layer (temp file reaper)
+│       ├── intelligence/  # ATS CV builder, job scraper (150 sample jobs)
+│       └── support/       # WebSocket support agent + connection hub
+├── frontend/         # Next.js 16 (App Router) + Tailwind CSS
+│   ├── src/app/
+│   │   ├── onboarding/    # 3-step wizard (region → sector → profile)
+│   │   ├── dashboard/     # Autopilot toggle + SSE log console
+│   │   ├── track/         # Application ledger with pipeline view
+│   │   └── interview/[id] # STAR-framework interview simulator
+│   ├── src/components/
+│   │   ├── FloatingGuide.tsx  # 24/7 support agent (7-sec stall detection)
+│   │   └── AppNav.tsx
+│   └── src/lib/
+│       ├── api.ts     # Fully typed API client
+│       └── ws.ts      # WebSocket client with auto-reconnect
+├── chrome_extension/ # Browser extension (companion)
+├── docker-compose.yml
+├── .env.example
+└── LICENSE
+```
+
+---
+
+## Features
+
+| Feature | Detail |
+|---|---|
+| **Flexible onboarding** | Path A: CV upload (PDF/DOCX); Path B: manual profile builder that generates an ATS-optimised CV without any upload |
+| **10 regions** | UK, USA, Canada, Australia, New Zealand, Germany, France, Netherlands, Ireland, Spain |
+| **5 sectors** | Technology, Finance, Healthcare, Marketing, Engineering |
+| **Autopilot engine** | 8-second async cycle — scans, applies, updates tracking automatically |
+| **Stealth automation** | Humanised typing (50–180 ms/char), non-linear scroll, randomised click delays, `navigator.webdriver` override, robots.txt compliance |
+| **GDPR transience** | CV files wiped from disk as soon as the submission loop closes; background TTL reaper runs every 60 s |
+| **Support agent** | WebSocket-powered, 7-second stall detection triggers field-specific suggestions; auto-reconnects at 5 s |
+| **Interview simulator** | STAR-framework mock questions, company intel, culture signals — fully template-based, no LLM required |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- Playwright Chromium (`playwright install chromium`)
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:3000
+```
+
+### Docker (full stack)
+
+```bash
+cp .env.example .env   # fill in your values
+docker compose up --build
+```
+
+Services:
+
+| Service | Port |
+|---|---|
+| Frontend | 3000 |
+| Backend API | 8000 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and set:
+
+```
+DATABASE_URL=sqlite:///./tapapply.db   # or postgresql://...
+SECRET_KEY=change-me
+PROXY_URL=                             # optional residential proxy
+```
+
+---
+
+## API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/onboarding/step1` | Set region |
+| `POST` | `/api/onboarding/step2` | Set sector |
+| `POST` | `/api/onboarding/step3/upload` | Upload CV (PDF/DOCX) |
+| `POST` | `/api/onboarding/step3/manual` | Manual profile → ATS CV |
+| `GET` | `/api/profile/{user_id}` | Fetch profile |
+| `GET` | `/api/jobs/{user_id}` | Available job listings |
+| `GET` | `/api/applications/{user_id}` | All applications |
+| `PATCH` | `/api/applications/{id}/status` | Update application status |
+| `GET` | `/api/interview/{application_id}` | Interview prep session |
+| `POST` | `/api/autopilot/enable` | Start autopilot |
+| `POST` | `/api/autopilot/disable` | Stop autopilot |
+| `GET` | `/api/logs/stream` | SSE event stream (log + stats) |
+| `WS` | `/ws/support/{client_id}` | Support agent WebSocket |
+
+---
+
+## License
+
+MIT

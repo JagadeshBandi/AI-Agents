@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TapApply Companion</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            font-family: system-ui, sans-serif;
+            background: #020617;
+            color: #e2e8f0;
+            width: 360px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        input, textarea, select, button {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 10px 12px;
+            margin-top: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        button {
+            margin-top: 12px;
+            border: none;
+            background: #10b981;
+            color: #020617;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .log {
+            margin-top: 12px;
+            padding: 10px;
+            background: #020617;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            max-height: 140px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 18px; margin-bottom: 12px;">TapApply Companion</h1>
+    <form id="extensionForm">
+        <label>
+            Keywords
+            <input id="keywords" value="software engineer" />
+        </label>
+        <label>
+            Location
+            <input id="location" value="London" />
+        </label>
+        <label>
+            Country
+            <input id="country" value="GB" />
+        </label>
+        <label>
+            Tone
+            <select id="humanizer">
+                <option>Professional</option>
+                <option>Friendly</option>
+                <option>Creative</option>
+                <option>Executive</option>
+            </select>
+        </label>
+        <label>
+            Name
+            <input id="name" value="Ayesha Patel" />
+        </label>
+        <label>
+            Email
+            <input id="email" value="ayesha@example.com" />
+        </label>
+        <label>
+            Resume summary
+            <textarea id="resumeText">Experienced software engineer with UK hiring readiness and sponsor-friendly delivery experience.</textarea>
+        </label>
+        <button id="startButton" type="submit">Start TapApply Pipeline</button>
+    </form>
+    <div class="log" id="extensionLog">Ready. Ensure backend is running at http://localhost:8000</div>
+    <script src="popup.js"></script>
+</body>
+</html>
