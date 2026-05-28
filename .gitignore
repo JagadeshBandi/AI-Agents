@@ -205,3 +205,34 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ── Node / Next.js ────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Project-specific runtime artifacts ───────────────────────
+*.db
+*.log
+logs/
+secure_data/
+uploads/
+cache/
+data/
+models/
+static/
+
+# ── Docker ────────────────────────────────────────────────────
+.dockerignore
+
+# ── macOS ─────────────────────────────────────────────────────
+.DS_Store
+*.DS_Store
