@@ -1,16 +1,14 @@
 """
 TapApply conversational support agent.
 
-Handles WebSocket messages from the floating guide widget. Uses Claude AI
-when the API key is available; falls back to a rich, platform-aware keyword
-engine that covers UK/global job-market specifics, Reed, TotalJobs, LinkedIn,
-Indeed and general career advice — never the same generic loop.
+Handles WebSocket messages using a rich, platform-aware keyword engine
+that covers UK/global job-market specifics, Reed, TotalJobs, LinkedIn,
+Indeed and general career advice — no external API required.
 """
 
-import os
 import re
 import random
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from .ws_hub import WSHub
 
 DISCLAIMER = (
@@ -18,77 +16,6 @@ DISCLAIMER = (
     "Double-check anything before you act on it, but I'm genuinely here to help. "
     "What are you working on?"
 )
-
-# ---------------------------------------------------------------------------
-# Claude AI — lazy singleton
-# ---------------------------------------------------------------------------
-
-_claude_client = None
-
-
-def _get_claude_client():
-    global _claude_client
-    if _claude_client is not None:
-        return _claude_client
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
-    try:
-        import anthropic
-        _claude_client = anthropic.Anthropic(api_key=api_key)
-        print("[SupportAgent] Claude AI client initialised.")
-    except Exception as exc:
-        print(f"[SupportAgent] Could not init Claude client: {exc}")
-    return _claude_client
-
-
-_SYSTEM_PROMPT = """You are TapApply Guide — a sharp, direct, knowledgeable career peer embedded in TapApply, an autonomous job-application platform.
-
-Your personality: you are confident, practical, and human — like a senior colleague who has hired people and been hired themselves. You give real information, not motivational coaching. You have specific knowledge of UK, US, Canadian, Australian, and EU job markets.
-
-Platform knowledge you must use when relevant:
-- Reed.co.uk: best for agency-placed roles, certification-heavy fields (accountancy, nursing, engineering), and volume recruitment. CV must use chronological format, no photos.
-- TotalJobs: dominant for direct employer postings, operational and corporate roles. Strong in engineering, logistics, retail. Slightly more flexible on CV style.
-- Indeed: global reach, strong for SME and startup roles. Apply-with-Indeed is common; optimise headline and summary for keyword scanning.
-- LinkedIn: best for networking, recruiter outreach, and senior roles. Headline + About section are the first things recruiters read — not the job history.
-- Adzuna: UK aggregator — pulls from multiple boards, good for salary benchmarking.
-
-Formatting rules:
-- 2–4 sentences max unless the question genuinely needs a list.
-- Never say "certainly!", "great question!", "of course!", "as an AI", "I'd be happy to".
-- Never start with a compliment or filler.
-- Be direct — answer the question first, then add one useful follow-up detail.
-- If the user mentions a specific sector or role, tailor every answer to it.
-- For salary questions, give concrete market-rate figures for the user's region.
-- For platform questions, compare directly with specific strengths and weaknesses.
-- Never ask the user to "think of a concrete example" — coach them by asking a focused question or giving a structural template instead.
-"""
-
-
-async def _ask_claude(message: str, sector: str, history: List[dict]) -> Optional[str]:
-    client = _get_claude_client()
-    if client is None:
-        return None
-    try:
-        messages = []
-        # Include recent conversation history for context (last 6 turns)
-        for turn in history[-6:]:
-            messages.append({"role": turn["role"], "content": turn["content"]})
-        # Inject sector context into the final user message
-        full_message = f"[User sector: {sector}]\n\n{message}" if sector else message
-        messages.append({"role": "user", "content": full_message})
-
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=350,
-            system=_SYSTEM_PROMPT,
-            messages=messages,
-        )
-        return response.content[0].text.strip()
-    except Exception as exc:
-        print(f"[SupportAgent] Claude API error: {exc}")
-        return None
-
 
 # ---------------------------------------------------------------------------
 # Keyword fallback — rich, platform-aware, never repeats
@@ -512,9 +439,6 @@ class SupportAgent:
             _conversation_history.pop(client_id, None)
 
     async def _generate_response(self, message: str, sector: str, history: List[dict]) -> str:
-        ai_response = await _ask_claude(message, sector, history)
-        if ai_response:
-            return ai_response
         return _keyword_fallback(message, sector)
 
 
